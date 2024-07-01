@@ -62,15 +62,12 @@ const OFFENSIVE_WORDS = [
   'camel jockey',
   'wagga',
   'nigr',
-  'naga',
-  'n|gger',
   'shh==it',
   'fvvvcker',
   'b!!tch',
   'cv } nt',
   'B!!tch',
   'aa$$ ',
-  'n^ggers',
   'cocksucker', 'cock sucker',
   'cum dumpster', 'cumdumpster',
   'cum guzzler',
@@ -1731,7 +1728,14 @@ const OFFENSIVE_WORDS = [
   'wop',
   'wophead',
   'zip in the wire',
-  'zipperhead'
+  'zipperhead',
+  'prostitute',
+  '1993',
+  'ni-',
+  'd!ck',
+  's1ut',
+  'pu$$y'
+  
 ];
 
 module.exports = OFFENSIVE_WORDS;
