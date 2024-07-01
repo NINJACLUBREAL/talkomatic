@@ -323,6 +323,30 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="chat_room.js"></script>
     <script>
+        function setCookie(name, value, days) {
+    var expires = "";
+    if (days) {
+        var date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "") + expires + "; path=/";
+}
+
+function getCookie(name) {
+    let cookieArray = document.cookie.split(';');
+    for (let i = 0; i < cookieArray.length; i++) {
+        let cookiePair = cookieArray[i].split('=');
+        if (name == cookiePair[0].trim()) {
+            return decodeURIComponent(cookiePair[1]);
+        }    
+    }
+    return null;
+}
+
+function deleteCookie(name) {
+    document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+}
         function checkBan() {
             const banned = getCookie('banned');
             const banExpiration = getCookie('banExpiration');
@@ -346,7 +370,7 @@
             const roomType = urlParams.get('roomType');
             const roomName = urlParams.get('roomName');
             const userColorName = decodeURIComponent(urlParams.get('txtclr')) || 'white';
-            const userColor = getColorHex(userColorName);
+            const userColor = "#ffffff"//getColorHex(userColorName);
             
             document.getElementById('roomId').textContent = roomId;
             document.getElementById('headerRoomId').textContent = roomId;

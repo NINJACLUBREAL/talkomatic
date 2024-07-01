@@ -135,9 +135,9 @@ io.on('connection', (socket) => {
     });
 
     socket.on('createRoom', (roomData) => {
-        const { username, location, userId, name, type, color } = roomData;
+        const { username, location, name, type, color } = roomData;
     
-        if (!username || !location || !userId || !name || !['public', 'private', 'secret'].includes(type)) {
+        if (!username || !location || !name || !['public', 'private', 'secret'].includes(type)) {
             socket.emit('error', 'Invalid input');
             return;
         }
@@ -157,7 +157,7 @@ io.on('connection', (socket) => {
             id: roomId,
             name: name,
             type: type,
-            users: [{ username, location, userId, socketId: socket.id, color, modMode: allowedMods.includes(userId) }],
+            users: [{ username, location, userId:socket.userId, socketId: socket.id, color, modMode: allowedMods.includes(socket.userId) }],
             birthdayMessagesSent: new Set(),
             votes: {}
         };
@@ -174,11 +174,11 @@ io.on('connection', (socket) => {
             roomId, 
             username, 
             location, 
-            userId, 
+            userId:socket.userId,
             roomType: type, 
             roomName: name,
             color, 
-            modMode: allowedMods.includes(userId)
+            modMode: allowedMods.includes(socket.userId)
         });
         socket.emit('initializeUsers', room.users);
     
@@ -186,9 +186,9 @@ io.on('connection', (socket) => {
     });
 
     socket.on('joinRoom', (data) => {
-        const { roomId, username, location, userId, color, avatar } = data;
+        const { roomId, username, location, color, avatar } = data;
     
-        if (!roomId || !username || !location || !userId) {
+        if (!roomId || !username || !location  ) {
             socket.emit('error', 'Invalid input');
             return;
         }
@@ -205,7 +205,8 @@ io.on('connection', (socket) => {
 
         const room = rooms.get(roomId);
         if (room) {
-            const existingUser = room.users.find(user => user.userId === userId);
+            
+            const existingUser = room.users.find(user => {console.log(user.userId,socket.userId);return user.userId === socket.userId});
             if (existingUser) {
                 socket.emit('duplicateUser', { message: 'You are already in this room.', redirectUrl: 'index.html' });
                 return;
@@ -217,13 +218,13 @@ io.on('connection', (socket) => {
             }
 
             if (room.users.length < 5) {
-                const modMode = allowedMods.includes(userId);
-                room.users.push({ username, location, userId, socketId: socket.id, color, modMode, avatar });
+                const modMode = allowedMods.includes(socket.userId);
+                room.users.push({ username, location, userId:socket.userId, socketId: socket.id, color, modMode, avatar });
                 socket.join(roomId);
                 io.emit('roomUpdated', room);
-                socket.emit('roomJoined', { roomId, username, location, userId, roomType: room.type, roomName: room.name, color, modMode, avatar });
+                socket.emit('roomJoined', { roomId, username, location, userId:socket.userId, roomType: room.type, roomName: room.name, color, modMode, avatar });
                 socket.emit('initializeUsers', room.users);
-                socket.to(roomId).emit('userJoined', { roomId, username, location, userId, color, modMode, avatar });
+                socket.to(roomId).emit('userJoined', { roomId, username, location, userId:socket.userId, color, modMode, avatar });
 
                 const voteCounts = {};
                 for (const [key, value] of Object.entries(room.votes)) {
@@ -279,8 +280,9 @@ io.on('connection', (socket) => {
     });
 
     socket.on('typing', (data) => {
-        const { roomId, userId, message, color } = data;
-        socket.to(roomId).emit('typing', { userId, message, color });
+        const { roomId, message, color } = data;
+
+        socket.to(roomId).emit('typing', { userId:socket.userId, message, color });
     });
 
     socket.on('message', (data) => {

@@ -468,6 +468,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
     });
 
     window.addEventListener('beforeunload', () => {
+        console.log("test")
         socket.emit('leaveRoom', { roomId, userId });
     });
 
