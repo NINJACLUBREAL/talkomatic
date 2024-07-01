@@ -23,7 +23,21 @@ const bannedUsers = new Map();
 app.use(express.static(path.join(__dirname)));
 app.use(cookieParser());
 app.use(compression());
-// app.use(helmet());
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "https://ajax.googleapis.com/", "https://cdnjs.cloudflare.com/", "'unsafe-inline'"],
+            styleSrc: ["'self'", "https://cdnjs.cloudflare.com/", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:", "https://%2A.cloudflare.com/"],
+            connectSrc: ["'self'", "ws://localhost:3000"],
+            frameSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            upgradeInsecureRequests: [],
+        },
+    },
+    crossOriginEmbedderPolicy: false,
+}));
 // app.use(rateLimit({
 //     windowMs: 15 * 60 * 1000,
 //     max: 100
