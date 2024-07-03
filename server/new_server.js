@@ -10,7 +10,7 @@ const helmet = require('helmet');
 const bodyParser = require('body-parser');
 const session = require('express-session')
 const OFFENSIVE_WORDS = require('../js/offensiveWords.js');
-
+const dotenv = require("dotenv")
 const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
