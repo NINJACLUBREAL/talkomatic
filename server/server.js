@@ -29,7 +29,21 @@ const allowedMods = ['user_j369j5gkz','user_crzuhudgz','user_cc7r68nu0','user_pl
 app.use(express.static(path.join(__dirname, '../')));
 app.use(cookieParser());
 app.use(compression());
-app.use(helmet());
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "https://ajax.googleapis.com/", "https://cdnjs.cloudflare.com/","https://unpkg.com", "'unsafe-inline'"],
+            styleSrc: ["'self'", "https://cdnjs.cloudflare.com/", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:", "https://cdnjs.cloudflare.com/"],
+            connectSrc: ["'self'", "ws://localhost:3000"],
+            frameSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            upgradeInsecureRequests: [],
+        },
+    },
+    crossOriginEmbedderPolicy: false,
+}));
 app.use(rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100
@@ -44,7 +58,7 @@ app.use((req, res, next) => {
 });
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '../index.html'));
+    res.sendFile(path.join(__dirname, '../html/index.html'));
 });
 
 app.get('/join.html', (req, res) => {

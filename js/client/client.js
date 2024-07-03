@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(error => console.error('Error fetching offensive words:', error));
 
     socket.emit('userConnected', { userId });
+    socket.emit("getExistingRooms")
 
     window.addEventListener('beforeunload', () => {
         socket.emit('userDisconnected', { userId });
@@ -187,17 +188,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const roomData = {
-            username: username,
-            location: location,
             userId: userId,
             name: roomName,
             type: roomType,
-            color: selectedColor,
-            avatar: avatar
         };
     
         console.log('Sending room creation request:', roomData);
         socket.emit('createRoom', roomData);
+        window.location.href = `chat_room.html?roomId=${roomId}&username=${encodeURIComponent(username)}&location=${encodeURIComponent(location)}&userId=${userId}&roomType=${roomType}&roomName=${encodeURIComponent(roomName)}&txtclr=${encodeURIComponent(color)}&avatar=${avatar}`;
+        
     });
 
     roomList.addEventListener('click', (event) => {
@@ -220,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const roomName = event.target.dataset.roomName;
             const userColor = getCookie('userColor') || 'white';
             const userAvatar = getCookie('userAvatar') || 'avatar15';
-            socket.emit('joinRoom', { roomId, username, location, userId, color: userColor, avatar: userAvatar });
+            window.location.href = `chat_room.html?roomId=${roomId}&username=${encodeURIComponent(username)}&location=${encodeURIComponent(location)}&userId=${userId}&roomType=${roomType}&roomName=${encodeURIComponent(roomName)}&txtclr=${encodeURIComponent(userColor)}&avatar=${userAvatar}`;
         }
     });
 
@@ -253,16 +252,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (existingRoomElement) {
             existingRoomElement.remove();
         }
-        if (room.type === 'public') {
-            const roomElement = createRoomElement(room);
-            roomList.appendChild(roomElement);
-            updateRoomCount();
-        }
-    
-        if (socket.id === room.users[0].socketId) {
-            const url = `html/chat_room.html?roomId=${room.id}&username=${encodeURIComponent(room.users[0].username)}&location=${encodeURIComponent(room.users[0].location)}&userId=${room.users[0].userId}&roomType=${room.type}&roomName=${encodeURIComponent(room.name)}&txtclr=${encodeURIComponent(room.users[0].color)}&avatar=${room.users[0].avatar || getCookie('userAvatar') || 'avatar15'}`;
-            window.location.href = url;
-        }
+        const roomElement = createRoomElement(room);
+        roomList.appendChild(roomElement);
+        updateRoomCount();
     });
 
     socket.on('existingRooms', (rooms) => {
@@ -297,7 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     socket.on('roomJoined', (data) => {
         const { roomId, username, location, userId, roomType, roomName, color, avatar } = data;
-        window.location.href = `html/chat_room.html?roomId=${roomId}&username=${encodeURIComponent(username)}&location=${encodeURIComponent(location)}&userId=${userId}&roomType=${roomType}&roomName=${encodeURIComponent(roomName)}&txtclr=${encodeURIComponent(color)}&avatar=${avatar}`;
+        window.location.href = `chat_room.html?roomId=${roomId}&username=${encodeURIComponent(username)}&location=${encodeURIComponent(location)}&userId=${userId}&roomType=${roomType}&roomName=${encodeURIComponent(roomName)}&txtclr=${encodeURIComponent(color)}&avatar=${avatar}`;
     });
 
     socket.on('roomUpdated', (room) => {
@@ -363,7 +355,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-
+    function escapeHTML(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, (m) => map[m]);
+    }
     function createRoomElement(room) {
         const roomElement = document.createElement('div');
         roomElement.id = `room-${room.id}`;
@@ -372,20 +373,20 @@ document.addEventListener('DOMContentLoaded', () => {
         roomElement.innerHTML = 
             `<div class="room-details">
                 <div class="room-info">
-                    <div class="room-header">${room.name} (${room.users.length}/5)</div>
+                    <div class="room-header">${escapeHTML(room.name)} (${room.users.length }/5)</div>
                     <div class="public-room-info">
                         (${room.type.charAt(0).toUpperCase() + room.type.slice(1)} Room) <img src="icons/handshake.png" alt="${room.type} Room" class="room-icon">
                     </div>
                 </div>
                 <div class="user-info">
                     ${room.users.map((user, index) => 
-                        `<div class="user-detail" data-user-id="${user.userId}"><img src="icons/chatbubble.png" alt="Chat" class="details-icon"> ${index + 1}. ${user.username} / ${user.location}</div>`
+                        `<div class="user-detail" data-user-id="${escapeHTML(user.userId)}"><img src="icons/chatbubble.png" alt="Chat" class="details-icon"> ${index + 1}. ${escapeHTML(user.username)} / ${escapeHTML(user.location)}</div>`
                     ).join('')}
                 </div>
             </div>
             <div class="chat-button-container">
                 ${room.users.length < 5 ? 
-                    `<button class="enter-chat-button" data-room-id="${room.id}" data-room-type="${room.type}" data-room-name="${room.name}">
+                    `<button class="enter-chat-button" data-room-id="${room.id}" data-room-type="${room.type}" data-room-name="${escapeHTML(room.name)}">
                         Enter <img src="icons/chatbubble.png" alt="Chat" class="button-icon">
                     </button>` 
                  : 

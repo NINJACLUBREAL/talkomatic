@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
             }
         }
 
-    socket.emit('joinRoom', { roomId, username, location: userLocation, userId, color: userColorName, avatar: userAvatar });
+    socket.emit('joinRoom', { roomId }); 
 
     socket.on('initializeUsers', (users) => {
         chatRoom.innerHTML = '';
