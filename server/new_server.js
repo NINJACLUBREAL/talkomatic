@@ -150,8 +150,8 @@ io.on('connection', (socket) => {
         if(sessions.get(session_id)) {
             return socket.emit("alreadyConnected")
         }
-        sessions.set(session_id,filterObject(parse(socket.handshake.headers.cookie),(value,key)=>{return ["userColor","userAvatar","username","location"].includes(key)}));
-        const userId = generateUserId
+        sessions.set(session_id,filterObject(parse(socket.handshake.headers.cookie),(value,key)=>{return ["userId","userColor","userAvatar","username","location"].includes(key)}));
+
         sessions.update(session_id,{modMode:false})
 
     });
