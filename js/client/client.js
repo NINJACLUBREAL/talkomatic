@@ -1,12 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
     const socket = io();
-
     const defaultUsername = getCookie('username') || '';
     const defaultLocation = getCookie('location') || '';
 
     document.getElementById('name').value = defaultUsername;
     document.getElementById('location').value = defaultLocation;
     
+
     let selectedColor = getCookie('userColor') || "#FFFFFF";
 
     let userId = getCookie('userId');
@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
         userId = generateUserId();
         setCookie('userId', userId, 30);
     }
+    
 
     let OFFENSIVE_WORDS = [];
     fetch('/offensive-words')
@@ -26,9 +27,9 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.emit('userConnected', { userId });
     socket.emit("getExistingRooms")
 
-    window.addEventListener('beforeunload', () => {
-        socket.emit('userDisconnected', { userId });
-    });
+    // window.addEventListener('beforeunload', () => {
+    //     socket.emit('userDisconnected', { userId });
+    // });
 
     const createRoomBtn = document.getElementById('createRoomBtn');
     const roomList = document.getElementById('roomList');
@@ -141,23 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Check for mod code
-        const code = username + location;
-        fetch('/verify-mod-code', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ code, userId })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                toastr.success('Mod mode activated');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-        });
+
     };
 
     window.signOut = function () {
@@ -198,6 +183,20 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = `chat_room.html?roomId=${roomId}&username=${encodeURIComponent(username)}&location=${encodeURIComponent(location)}&userId=${userId}&roomType=${roomType}&roomName=${encodeURIComponent(roomName)}&txtclr=${encodeURIComponent(color)}&avatar=${avatar}`;
         
     });
+
+    window.verifyModerator = () => {
+        const codeInput = document.querySelector("input#code")
+        socket.emit("verifyModCode", {code:codeInput.value})    
+    }
+    socket.on("modVerification",(data)=>{
+        const {success} = data;
+        if(success) {
+            toastr.success("Moderator mode activated");
+        }
+        else {
+            toastr.error("Incorrect Code")
+        }
+    })
 
     roomList.addEventListener('click', (event) => {
         if (event.target.classList.contains('enter-chat-button')) {

@@ -1,3 +1,4 @@
+// todo = implement the session class
 const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
@@ -10,25 +11,25 @@ const helmet = require('helmet');
 const bodyParser = require('body-parser');
 const session = require('express-session')
 const OFFENSIVE_WORDS = require('../js/offensiveWords.js');
-const dotenv = require("dotenv")
+const {Sessions} = require("./sessions.js")
+const {Rooms} = require("./rooms.js")
+require("dotenv").config()
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
 
 app.use(bodyParser.json());
 
-const rooms = new Map();
-const activeUsers = new Map();
-const roomDeletionTimeouts = new Map();
-const bannedUsers = new Map();
+
 
 app.use(express.static(path.join(__dirname)));
 app.use(cookieParser());
 app.use(compression());
 const sessionMiddleware = session({
-    secret: "changeit",
-    resave: true,
-    saveUninitialized: true,
+    secret: process.env.SECRET,
+    // resave: true,
+    // saveUninitialized: true,
   });
   
 app.use(sessionMiddleware);
@@ -98,24 +99,7 @@ app.get("*.jpg", (req,res) => {
     res.sendFile(path.join(__dirname, `../images/${req.params[0]}.jpg`));
 })
 
-
-app.post('/verify-mod-code', (req, res) => {
-    const { code, userId } = req.body;
-    const correctCode = '786215'; // Your actual mod code
-
-    if (code === correctCode && allowedMods.includes(userId)) {
-        res.json({ success: true });
-    } else {
-        res.json({ success: false });
-    }
-});
-
-
-
 const port = process.env.PORT || 3000;
-server.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-});
 
 function filterObject(obj, callback) {
     return Object.fromEntries(Object.entries(obj).
@@ -124,35 +108,75 @@ function filterObject(obj, callback) {
 function generateRoomId() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
+function generateUserId() {
+    return 'user_' + Math.random().toString(36).substr(2, 9);
+}
+
+const rooms = new Rooms;
+const activeUsers = new Map();
+const roomDeletionTimeouts = new Map();
+const bannedUsers = new Map();
+
+const sessions = new Sessions
+function updateCounts() {
+    io.emit("updateCounts",{roomsCount: [...rooms.rooms.values()].filter((room)=>{return room.type == "public"}).length, usersCount: sessions.sessions.size})
+}
+
+sessions.on("newSession",updateCounts)
+sessions.on("sessionDelete",updateCounts)
+
+rooms.on("roomUpdated",(room)=>{
+
+    if(room.type == "public") {   
+        io.emit("roomUpdated",room)
+    } 
+})
+rooms.on("roomDeleted",(data)=>{
+    const [key,room] = Object.entries(data)[1];
+    if(room.type == "public") {
+        io.emit("roomRemoved",room.id)
+    } 
+})
+
 
 io.engine.use(sessionMiddleware);
 io.setMaxListeners(0);
 io.on('connection', (socket) => {
-    socket.on('userConnected', () => {
+    let session_id = socket.request.session.id;
 
-        socket.request.session.reload((err) => {
-            if (err) {
-              return socket.disconnect();
-            }
-            activeUsers[socket.request.session.id] = parse(socket.handshake.headers.cookie);
-            socket.request.session.save();
-          });
+
+    socket.on('userConnected', () => {
+        updateCounts() 
+        if(sessions.get(session_id)) {
+            return socket.emit("alreadyConnected")
+        }
+        sessions.set(session_id,filterObject(parse(socket.handshake.headers.cookie),(value,key)=>{return ["userColor","userAvatar","username","location"].includes(key)}));
+        const userId = generateUserId
+        sessions.update(session_id,{modMode:false})
+
     });
 
-    socket.on('userDisconnected', () => {
-        if (activeUsers[socket.request.session.id]){
-
-            activeUsers.delete(socket.request.session.id);
+    socket.on('userDisconnected', (data) => {
+        if (sessions.get(session_id) && !data.saveSession){
+            sessions.delete(session_id)
         }
     });
 
+    socket.on("verifyModCode",(data)=>{
+        if(sessions.get(session_id).modMode){
+            return socket.emit("modVerification",{success:true});
+        }
+        const {code} = data;
+        sessions.get(session_id).modMode = code === process.env.MOD_CODE;
+        socket.emit("modVerification",{success:code===process.env.MOD_CODE})
+    })
     socket.on('searchRoom',(data)=>{
         const room = rooms.get(data.roomId);
         socket.emit("searchResult",room && room.type !== 'secret' ? room : null);
     })
 
     socket.on('getExistingRooms',()=>{
-        socket.emit('existingRooms', [...rooms.values()].filter(room => {return room.type == 'public'}))
+        socket.emit('existingRooms', [...rooms.rooms.values()].filter(room => {return room.type == 'public'}))
     })
 
     socket.on("createRoom",(data)=>{
@@ -161,9 +185,8 @@ io.on('connection', (socket) => {
         if (!name  || !["secret","private","public"].includes(type)) {
             return socket.emit('error', 'Invalid input');
         }
-
         const roomId = generateRoomId() 
-        rooms.set(roomId, {name,type,id:roomId,users:[],ownerId:activeUsers[socket.request.session.id].userId,votes:{}})
+        rooms.set(roomId, {name,type,id:roomId,users:[],ownerId:sessions.get(session_id).userId,votes:{}})
         if (type == 'public') {
             io.emit('roomCreated', rooms.get(roomId));
         }
@@ -173,9 +196,8 @@ io.on('connection', (socket) => {
         
     })
     socket.on("joinRoom",(data)=>{
-        if (!activeUsers[socket.request.session.id]) {return;}
-
-        const {location,username,userId,userAvatar,userColor} = activeUsers[socket.request.session.id];
+        if(!sessions.get(session_id)) {return}
+        const {location,username,userId,userAvatar,userColor,modMode} = sessions.get(session_id);
         const room = rooms.get(data.roomId);
 
         if(!room) {
@@ -191,51 +213,50 @@ io.on('connection', (socket) => {
             return;
         }
 
-        const user = {color:userColor,location,username,avatar:userAvatar,userId};
+        const user = {color:userColor,location,username,avatar:userAvatar,userId,modMode};
 
-        room.users.push(user);
-
-        if(room.type=="public") {
-            io.emit('roomUpdated', room);
-        }
+        rooms.addUser(data.roomId,user);
         socket.join(room.id)
         socket.emit("initializeUsers",room.users);
         socket.to(room.id).emit("userJoined",user);
     })
 
     socket.on("disconnected",(reason)=>{
+        
         rooms.forEach((room)=>{
-            let user =  room.users.filter((user)=>{return user.userId == activeUsers[socket.request.session.id].userId });
+            let user =  room.users.filter((user)=>{return user.userId == sessions.get(session_id).userId });
             if (user) {
                 delete room.users[room.users.indexOf(user)];
                 socket.to(room).emit("userLeft", user)
             }
             })
+            sessions.delete(session_id)
     })
 
     socket.on("leaveRoom",(data)=> {
         const {roomId} = data;
+        if(!sessions.get(session_id)) {
+            return socket.emit("notConnected")
+        }
         const room = rooms.get(roomId)
         if (!room) {
             return socket.emit("roomNotFound");
         } 
-        const user = room.users.find((user)=>{return user.userId == activeUsers[socket.request.session.id].userId })
+        const user = room.users.find((user)=>{return user.userId == sessions.get(session_id).userId })
         if (user == undefined) {
             return socket.emit("notInRoom");
         }
         socket.to(room.id).emit("userLeft", user)
-        room.users = room.users.filter((room_user)=>{return room_user.userId != user.userId })
-        if(room.type=="public") {
-            io.emit('roomUpdated', room);
-        }
+        rooms.deleteUser(room.id,user);
     })
 
     socket.on('typing',(data)=>{
         const {roomId,message} = data;
-        const {userColor,userId} = activeUsers[socket.request.session.id]
+        const {userColor,userId} = sessions.get(session_id)
         socket.to(roomId).emit("typing",{roomId,message,color:userColor,userId})
 
     })
+
 
 
 
@@ -244,3 +265,7 @@ io.on('connection', (socket) => {
 
     })
 })
+
+server.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+});
